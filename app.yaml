@@ -1,8 +1,0 @@
-name: onlyflashcards
-services:
-- name: web
-  run_command: gunicorn --bind 0.0.0.0:$PORT wsgi:application
-  environment_slug: python
-  instance_count: 1
-  instance_size_slug: basic-xxs
-
