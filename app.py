@@ -60,4 +60,4 @@ def health_check():
 if __name__ == '__main__':
     # Only run in debug mode if explicitly in development
     debug_mode = os.environ.get('FLASK_ENV') == 'development'
-    app.run(debug=debug_mode, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=5000)
