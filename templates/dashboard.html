@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - OnlyFlashcards.com{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="mb-2">My Flashcard Sets</h1>
+            <p class="text-muted">Manage your flashcard sets</p>
+        </div>
+    </div>
+    
+    <!-- Create New Set Button -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <button class="btn btn-primary btn-lg" onclick="showCreateModal()">
+                <i class="bi bi-plus-circle"></i> Create New Set
+            </button>
+        </div>
+    </div>
+    
+    <!-- Flashcard Sets Grid -->
+    <div class="row" id="setsContainer">
+        {% for set in sets %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header">
+                    {{ set.title }}
+                </div>
+                <div class="card-body">
+                    <p class="card-text text-muted">
+                        {{ set.description[:100] }}{% if set.description|length > 100 %}...{% endif %}
+                    </p>
+                    <div class="mb-2">
+                        {% if set.is_public %}
+                        <span class="badge bg-mint text-dark">Public</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Private</span>
+                        {% endif %}
+                    </div>
+                    <small class="text-muted d-block mb-2">
+                        <i class="bi bi-calendar"></i> {{ set.created_at.strftime('%b %d, %Y') if set.created_at else 'Recently' }}
+                    </small>
+                    <small class="text-muted">
+                        <i class="bi bi-card-text"></i> {{ set_counts[set._id|string] or 0 }} cards
+                    </small>
+                </div>
+                <div class="card-footer bg-transparent border-0 d-flex gap-2">
+                        <a href="/set/{{ set._id }}" class="btn btn-sm btn-outline-primary flex-fill">
+                            <i class="bi bi-eye"></i> View
+                        </a>
+                        <button class="btn btn-sm btn-link text-muted p-0" onclick="deleteSet('{{ set._id }}', '{{ set.title }}')" title="Delete Set">
+                            <i class="bi bi-x-circle fs-5"></i>
+                        </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+        
+        {% if not sets %}
+        <div class="col-12">
+            <div class="alert alert-info text-center">
+                <i class="bi bi-info-circle"></i> You don't have any flashcard sets yet. Create one to get started!
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Create Set Modal -->
+<div class="modal fade" id="createSetModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-mint">
+                <h5 class="modal-title">Create New Flashcard Set</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createSetForm">
+                    <div class="mb-3">
+                        <label for="setTitle" class="form-label">Title *</label>
+                        <input type="text" class="form-control" id="setTitle" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="setDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="setDescription" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="setPublic">
+                        <label class="form-check-label" for="setPublic">
+                            Make this set public
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="createSet()">Create Set</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function showCreateModal() {
+        const modal = new bootstrap.Modal(document.getElementById('createSetModal'));
+        modal.show();
+    }
+    
+    async function createSet() {
+        const title = document.getElementById('setTitle').value.trim();
+        const description = document.getElementById('setDescription').value.trim();
+        const isPublic = document.getElementById('setPublic').checked;
+        
+        if (!title) {
+            alert('Title is required');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/sets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    title: title,
+                    description: description,
+                    is_public: isPublic
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            
+            // Reload page to show new set
+            window.location.reload();
+        } catch (error) {
+            console.error('Create set error:', error);
+            alert('Error creating set. Please try again.');
+        }
+    }
+    
+    async function deleteSet(setId, title) {
+        if (!confirm(`Are you sure you want to delete "${title}"? This action cannot be undone.`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/sets/${setId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            
+            // Reload page
+            window.location.reload();
+        } catch (error) {
+            console.error('Delete set error:', error);
+            alert('Error deleting set. Please try again.');
+        }
+    }
+</script>
+{% endblock %}
+

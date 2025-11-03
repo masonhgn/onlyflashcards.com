@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Login - OnlyFlashcards.com{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card">
+                <div class="card-header text-center">
+                    <h4 class="mb-0"><i class="bi bi-box-arrow-in-right"></i> Login</h4>
+                </div>
+                <div class="card-body p-4">
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Username or Email</label>
+                            <input type="text" class="form-control" id="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" required>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-box-arrow-in-right"></i> Login
+                            </button>
+                        </div>
+                    </form>
+                    <div id="loginError" class="alert alert-danger mt-3 d-none"></div>
+                    <div class="text-center mt-3">
+                        <p class="mb-0">Don't have an account? <a href="/register">Sign up here</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+        const errorDiv = document.getElementById('loginError');
+        
+        errorDiv.classList.add('d-none');
+        
+        if (!username || !password) {
+            errorDiv.textContent = 'Please fill in all fields';
+            errorDiv.classList.remove('d-none');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    username: username,
+                    password: password
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                errorDiv.textContent = data.error;
+                errorDiv.classList.remove('d-none');
+                return;
+            }
+            
+            // Success - redirect to dashboard
+            window.location.href = '/dashboard';
+        } catch (error) {
+            console.error('Login error:', error);
+            errorDiv.textContent = 'Error logging in. Please try again.';
+            errorDiv.classList.remove('d-none');
+        }
+    });
+</script>
+{% endblock %}
+

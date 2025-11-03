@@ -1,0 +1,559 @@
+{% extends "base.html" %}
+
+{% block title %}{{ set.title }} - OnlyFlashcards.com{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h2 class="mb-0">{{ set.title }}</h2>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">{{ set.description or 'No description' }}</p>
+                    <div class="d-flex gap-2 mb-3">
+                        {% if set.is_public %}
+                        <span class="badge bg-mint text-dark">Public</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Private</span>
+                        {% endif %}
+                        <span class="badge bg-info">{{ flashcards|length }} cards</span>
+                    </div>
+                    <div class="d-flex gap-2 align-items-center">
+                        {% if is_owner %}
+                        <button class="btn btn-sm btn-link text-muted p-0" onclick="deleteSet('{{ set._id }}', '{{ set.title }}')" title="Delete Set">
+                            <i class="bi bi-x-circle fs-5"></i>
+                        </button>
+                        {% endif %}
+                        {% if flashcards|length > 0 %}
+                        <a href="/set/{{ set._id }}/study" class="btn btn-sm btn-primary">
+                            <i class="bi bi-book"></i> Study
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Flashcards Display - Vertically Arranged -->
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div id="flashcardsContainer">
+                <!-- Existing Flashcards -->
+                {% for card in flashcards %}
+                <div class="card mb-4 flashcard-card" id="card-{{ card._id }}" data-card-id="{{ card._id }}">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <small class="text-muted">Front:</small>
+                            <p class="mb-0 flashcard-front">{{ card.front }}</p>
+                        </div>
+                        <hr>
+                        <div class="mb-3">
+                            <small class="text-muted">Back:</small>
+                            <p class="mb-0 flashcard-back">{{ card.back }}</p>
+                        </div>
+                        {% if is_owner %}
+                        <div class="d-flex justify-content-end gap-2 mt-3">
+                            <button class="btn btn-sm btn-link text-muted p-0" onclick="editCard('{{ card._id }}', event)" title="Edit Flashcard">
+                                <i class="bi bi-pencil fs-5"></i>
+                            </button>
+                            <button class="btn btn-sm btn-link text-muted p-0" onclick="deleteCard('{{ card._id }}')" title="Delete Flashcard">
+                                <i class="bi bi-x-circle fs-5"></i>
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+                
+                <!-- Add Card Button (only for owners) -->
+                {% if is_owner %}
+                <div class="text-center mb-4" id="addCardButtonContainer">
+                    <button class="btn btn-lg btn-primary" onclick="showInProgressCard()">
+                        <i class="bi bi-plus-circle"></i> Add Flashcard
+                    </button>
+                </div>
+                {% endif %}
+                
+                <!-- In-Progress Card (for adding new cards) - Hidden by default -->
+                {% if is_owner %}
+                <div class="card mb-4 flashcard-card in-progress-card" id="inProgressCard" style="display: none;">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <small class="text-muted">Front: <span class="text-muted" id="frontWordCount">0/100 words</span></small>
+                            <textarea class="form-control flashcard-input-front" id="flashcardFrontInput" rows="3" placeholder="Enter front side text..." maxlength="500"></textarea>
+                            <small class="text-danger d-none" id="frontError">Front text is required</small>
+                        </div>
+                        <hr>
+                        <div class="mb-3">
+                            <small class="text-muted">Back: <span class="text-muted" id="backWordCount">0/100 words</span></small>
+                            <textarea class="form-control flashcard-input-back" id="flashcardBackInput" rows="3" placeholder="Enter back side text..." maxlength="500"></textarea>
+                            <small class="text-danger d-none" id="backError">Back text is required</small>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2 mt-3">
+                            <button class="btn btn-sm btn-outline-secondary" onclick="hideInProgressCard()">
+                                <i class="bi bi-x-circle"></i> Cancel
+                            </button>
+                            <button class="btn btn-sm btn-link text-muted p-0" onclick="clearInProgressCard()" title="Clear">
+                                <i class="bi bi-trash fs-5"></i>
+                            </button>
+                            <button class="btn btn-sm btn-primary" onclick="saveInProgressCard()">
+                                <i class="bi bi-check-circle"></i> Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                {% if not flashcards and not is_owner %}
+                <div class="alert alert-info text-center">
+                    <i class="bi bi-info-circle"></i> No flashcards in this set yet.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{% if is_owner %}
+<script>
+    const currentSetId = '{{ set._id }}';
+    const MAX_WORDS = 100;
+    
+    function showInProgressCard() {
+        const inProgressCard = document.getElementById('inProgressCard');
+        const addButtonContainer = document.getElementById('addCardButtonContainer');
+        
+        if (inProgressCard) {
+            inProgressCard.style.display = 'block';
+            if (addButtonContainer) addButtonContainer.style.display = 'none';
+            
+            // Focus on first input
+            const frontInput = document.getElementById('flashcardFrontInput');
+            if (frontInput) {
+                frontInput.focus();
+            }
+        }
+    }
+    
+    function hideInProgressCard() {
+        const inProgressCard = document.getElementById('inProgressCard');
+        const addButtonContainer = document.getElementById('addCardButtonContainer');
+        
+        if (inProgressCard) {
+            inProgressCard.style.display = 'none';
+            if (addButtonContainer) addButtonContainer.style.display = 'block';
+        }
+        
+        clearInProgressCard();
+    }
+    
+    function clearInProgressCard() {
+        const frontInput = document.getElementById('flashcardFrontInput');
+        const backInput = document.getElementById('flashcardBackInput');
+        const frontError = document.getElementById('frontError');
+        const backError = document.getElementById('backError');
+        
+        if (frontInput) {
+            frontInput.value = '';
+            delete frontInput.dataset.editingCardId;
+        }
+        if (backInput) {
+            backInput.value = '';
+            delete backInput.dataset.editingCardId;
+        }
+        
+        updateWordCount();
+        hideErrors();
+        
+        // Reset save button
+        const saveBtn = document.querySelector('.in-progress-card .btn-primary');
+        if (saveBtn) {
+            saveBtn.innerHTML = '<i class="bi bi-check-circle"></i> Save';
+            saveBtn.onclick = function() { saveInProgressCard(); };
+        }
+    }
+    
+    function countWords(text) {
+        return text.trim().split(/\s+/).filter(word => word.length > 0).length;
+    }
+    
+    function updateWordCount() {
+        const frontInput = document.getElementById('flashcardFrontInput');
+        const backInput = document.getElementById('flashcardBackInput');
+        const frontWordCount = document.getElementById('frontWordCount');
+        const backWordCount = document.getElementById('backWordCount');
+        
+        if (frontInput && frontWordCount) {
+            const wordCount = countWords(frontInput.value);
+            frontWordCount.textContent = `${wordCount}/${MAX_WORDS} words`;
+            if (wordCount > MAX_WORDS) {
+                frontWordCount.classList.add('text-danger');
+            } else {
+                frontWordCount.classList.remove('text-danger');
+            }
+        }
+        
+        if (backInput && backWordCount) {
+            const wordCount = countWords(backInput.value);
+            backWordCount.textContent = `${wordCount}/${MAX_WORDS} words`;
+            if (wordCount > MAX_WORDS) {
+                backWordCount.classList.add('text-danger');
+            } else {
+                backWordCount.classList.remove('text-danger');
+            }
+        }
+    }
+    
+    function validateCardInputs() {
+        const frontInput = document.getElementById('flashcardFrontInput');
+        const backInput = document.getElementById('flashcardBackInput');
+        const frontError = document.getElementById('frontError');
+        const backError = document.getElementById('backError');
+        
+        let isValid = true;
+        hideErrors();
+        
+        const front = frontInput ? frontInput.value.trim() : '';
+        const back = backInput ? backInput.value.trim() : '';
+        
+        // Check if front is filled
+        if (!front) {
+            isValid = false;
+            if (frontError) {
+                frontError.textContent = 'Front text is required';
+                frontError.classList.remove('d-none');
+            }
+        } else {
+            // Check word count for front
+            const frontWords = countWords(front);
+            if (frontWords > MAX_WORDS) {
+                isValid = false;
+                if (frontError) {
+                    frontError.textContent = `Front text exceeds ${MAX_WORDS} words (${frontWords} words)`;
+                    frontError.classList.remove('d-none');
+                }
+            }
+        }
+        
+        // Check if back is filled
+        if (!back) {
+            isValid = false;
+            if (backError) {
+                backError.textContent = 'Back text is required';
+                backError.classList.remove('d-none');
+            }
+        } else {
+            // Check word count for back
+            const backWords = countWords(back);
+            if (backWords > MAX_WORDS) {
+                isValid = false;
+                if (backError) {
+                    backError.textContent = `Back text exceeds ${MAX_WORDS} words (${backWords} words)`;
+                    backError.classList.remove('d-none');
+                }
+            }
+        }
+        
+        return isValid;
+    }
+    
+    function hideErrors() {
+        const frontError = document.getElementById('frontError');
+        const backError = document.getElementById('backError');
+        
+        if (frontError) frontError.classList.add('d-none');
+        if (backError) backError.classList.add('d-none');
+    }
+    
+    async function saveInProgressCard() {
+        const frontInput = document.getElementById('flashcardFrontInput');
+        const backInput = document.getElementById('flashcardBackInput');
+        
+        if (!validateCardInputs()) {
+            return;
+        }
+        
+        const front = frontInput.value.trim();
+        const back = backInput.value.trim();
+        
+        try {
+            const response = await fetch(`/cards/set/${currentSetId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    front: front,
+                    back: back
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            
+            // Add the new card to the DOM (above the in-progress card)
+            const inProgressCard = document.getElementById('inProgressCard');
+            
+            if (!inProgressCard) {
+                console.error('In-progress card element not found');
+                window.location.reload();
+                return;
+            }
+            
+            const newCardHtml = `
+                <div class="card mb-4 flashcard-card" id="card-${data.flashcard.id}" data-card-id="${data.flashcard.id}">
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <small class="text-muted">Front:</small>
+                            <p class="mb-0 flashcard-front">${escapeHtml(data.flashcard.front)}</p>
+                        </div>
+                        <hr>
+                        <div class="mb-3">
+                            <small class="text-muted">Back:</small>
+                            <p class="mb-0 flashcard-back">${escapeHtml(data.flashcard.back)}</p>
+                        </div>
+                        <div class="d-flex justify-content-end gap-2 mt-3">
+                            <button class="btn btn-sm btn-link text-muted p-0" onclick="editCard('${data.flashcard.id}', event)" title="Edit Flashcard">
+                                <i class="bi bi-pencil fs-5"></i>
+                            </button>
+                            <button class="btn btn-sm btn-link text-muted p-0" onclick="deleteCard('${data.flashcard.id}')" title="Delete Flashcard">
+                                <i class="bi bi-x-circle fs-5"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Insert new card before the in-progress card
+            inProgressCard.insertAdjacentHTML('beforebegin', newCardHtml);
+            
+            // Clear the inputs and hide the in-progress card
+            clearInProgressCard();
+            hideInProgressCard();
+            
+            // Remove editing card ID from inputs
+            const frontInput = document.getElementById('flashcardFrontInput');
+            const backInput = document.getElementById('flashcardBackInput');
+            if (frontInput) delete frontInput.dataset.editingCardId;
+            if (backInput) delete backInput.dataset.editingCardId;
+            
+            // Update card count badge
+            const cardCountBadge = document.querySelector('.badge.bg-info');
+            if (cardCountBadge) {
+                const currentCount = parseInt(cardCountBadge.textContent) || 0;
+                cardCountBadge.textContent = `${currentCount + 1} cards`;
+            }
+        } catch (error) {
+            console.error('Save card error:', error);
+            alert('Error saving card. Please try again.');
+        }
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    function editCard(cardId, event) {
+        // Get values directly from the DOM elements (safest way)
+        const cardElement = document.getElementById(`card-${cardId}`);
+        if (!cardElement) return;
+        
+        const frontElement = cardElement.querySelector('.flashcard-front');
+        const backElement = cardElement.querySelector('.flashcard-back');
+        
+        const front = frontElement ? frontElement.textContent : '';
+        const back = backElement ? backElement.textContent : '';
+        
+        showEditForm(cardId, front, back);
+    }
+    
+    function showEditForm(cardId, front, back) {
+        // Show the in-progress card form
+        showInProgressCard();
+        
+        // Populate with existing values
+        const frontInput = document.getElementById('flashcardFrontInput');
+        const backInput = document.getElementById('flashcardBackInput');
+        
+        if (frontInput && backInput) {
+            frontInput.value = front;
+            backInput.value = back;
+            updateWordCount();
+            
+            // Store the card ID we're editing
+            frontInput.dataset.editingCardId = cardId;
+            backInput.dataset.editingCardId = cardId;
+            
+            // Update save button text
+            const saveBtn = document.querySelector('.in-progress-card .btn-primary');
+            if (saveBtn) {
+                saveBtn.innerHTML = '<i class="bi bi-check-circle"></i> Update';
+                saveBtn.onclick = function() { updateCard(cardId); };
+            }
+        }
+    }
+    
+    async function updateCard(cardId) {
+        const frontInput = document.getElementById('flashcardFrontInput');
+        const backInput = document.getElementById('flashcardBackInput');
+        
+        if (!validateCardInputs()) {
+            return;
+        }
+        
+        const front = frontInput.value.trim();
+        const back = backInput.value.trim();
+        
+        try {
+            const response = await fetch(`/cards/${cardId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    front: front,
+                    back: back
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            
+            // Update the card in the DOM
+            const cardElement = document.getElementById(`card-${cardId}`);
+            if (cardElement) {
+                const frontElement = cardElement.querySelector('.flashcard-front');
+                const backElement = cardElement.querySelector('.flashcard-back');
+                
+                if (frontElement) frontElement.textContent = front;
+                if (backElement) backElement.textContent = back;
+            }
+            
+            // Clear and hide the form
+            clearInProgressCard();
+            hideInProgressCard();
+            
+            // Reset save button
+            const saveBtn = document.querySelector('.in-progress-card .btn-primary');
+            if (saveBtn) {
+                saveBtn.innerHTML = '<i class="bi bi-check-circle"></i> Save';
+                saveBtn.onclick = function() { saveInProgressCard(); };
+            }
+        } catch (error) {
+            console.error('Update card error:', error);
+            alert('Error updating card. Please try again.');
+        }
+    }
+    
+    async function deleteCard(cardId) {
+        if (!confirm('Are you sure you want to delete this flashcard?')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/cards/${cardId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            
+            // Remove card from DOM
+            const cardElement = document.getElementById(`card-${cardId}`);
+            if (cardElement) {
+                cardElement.remove();
+            }
+            
+            // Update card count badge
+            const cardCountBadge = document.querySelector('.badge.bg-info');
+            if (cardCountBadge) {
+                const currentCount = parseInt(cardCountBadge.textContent) || 0;
+                cardCountBadge.textContent = `${Math.max(0, currentCount - 1)} cards`;
+            }
+            
+            // If no cards left, show message
+            const existingCards = document.querySelectorAll('.flashcard-card:not(.in-progress-card)');
+            if (existingCards.length === 0) {
+                const cardsContainer = document.getElementById('flashcardsContainer');
+                const inProgressCard = document.getElementById('inProgressCard');
+                if (inProgressCard) {
+                    inProgressCard.insertAdjacentHTML('beforebegin', 
+                        '<div class="alert alert-info text-center mb-4"><i class="bi bi-info-circle"></i> No flashcards in this set yet. Add your first card below!</div>'
+                    );
+                }
+            }
+        } catch (error) {
+            console.error('Delete card error:', error);
+            alert('Error deleting card. Please try again.');
+        }
+    }
+    
+    async function deleteSet(setId, title) {
+        if (!confirm(`Are you sure you want to delete "${title}"? This will delete all flashcards in this set.`)) {
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/sets/${setId}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            
+            // Redirect to dashboard
+            window.location.href = '/dashboard';
+        } catch (error) {
+            console.error('Delete set error:', error);
+            alert('Error deleting set. Please try again.');
+        }
+    }
+    
+    // Word count updates and validation
+    document.addEventListener('DOMContentLoaded', function() {
+        const frontInput = document.getElementById('flashcardFrontInput');
+        const backInput = document.getElementById('flashcardBackInput');
+        
+        if (frontInput && backInput) {
+            // Update word count on input
+            [frontInput, backInput].forEach(input => {
+                input.addEventListener('input', updateWordCount);
+                input.addEventListener('input', hideErrors);
+                
+                // Allow Enter key to save (Ctrl+Enter or Cmd+Enter)
+                input.addEventListener('keydown', function(e) {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                        e.preventDefault();
+                        saveInProgressCard();
+                    }
+                });
+            });
+        }
+    });
+</script>
+{% endif %}
+{% endblock %}

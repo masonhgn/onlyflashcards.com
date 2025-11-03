@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block title %}Study: {{ set.title }} - OnlyFlashcards.com{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <!-- Header -->
+            <div class="text-center mb-4">
+                <h2>{{ set.title }}</h2>
+                <p class="text-muted">Click the card to flip it</p>
+            </div>
+            
+            <!-- Progress Indicator -->
+            <div class="text-center mb-4">
+                <span class="badge bg-mint text-dark fs-6" id="progressIndicator">
+                    1 / {{ flashcards|length }}
+                </span>
+            </div>
+            
+            <!-- Flashcard Display -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card flashcard-display" id="flashcardDisplay" onclick="flipCard()" style="min-height: 300px; cursor: pointer;">
+                        <div class="card-body d-flex align-items-center justify-content-center" style="min-height: 300px; position: relative;">
+                            <div id="frontSide" class="flashcard-side front-side" style="position: absolute; width: 100%; backface-visibility: hidden;">
+                                <p class="fs-4 mb-0 text-center" id="frontText">{{ flashcards[0].front }}</p>
+                            </div>
+                            <div id="backSide" class="flashcard-side back-side" style="position: absolute; width: 100%; backface-visibility: hidden; transform: rotateY(180deg);">
+                                <p class="fs-4 mb-0 text-center" id="backText">{{ flashcards[0].back }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Navigation -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <button class="btn btn-outline-primary btn-lg" id="prevBtn" onclick="previousCard()" disabled>
+                            <i class="bi bi-arrow-left"></i> Previous
+                        </button>
+                        
+                        <button class="btn btn-outline-secondary btn-lg" onclick="resetCard()">
+                            <i class="bi bi-arrow-clockwise"></i> Reset Card
+                        </button>
+                        
+                        <button class="btn btn-outline-primary btn-lg" id="nextBtn" onclick="nextCard()" {% if flashcards|length == 1 %}disabled{% endif %}>
+                            Next <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Back to Set -->
+            <div class="row">
+                <div class="col-12 text-center">
+                    <a href="/set/{{ set._id }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Set
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const flashcards = {{ flashcards_data|tojson|safe }};
+    let currentIndex = 0;
+    let isFlipped = false;
+    
+    function updateCard() {
+        const card = flashcards[currentIndex];
+        const frontText = document.getElementById('frontText');
+        const backText = document.getElementById('backText');
+        const progressIndicator = document.getElementById('progressIndicator');
+        const prevBtn = document.getElementById('prevBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        
+        if (frontText) frontText.textContent = card.front;
+        if (backText) backText.textContent = card.back;
+        
+        if (progressIndicator) {
+            progressIndicator.textContent = `${currentIndex + 1} / ${flashcards.length}`;
+        }
+        
+        // Update navigation buttons
+        if (prevBtn) {
+            prevBtn.disabled = currentIndex === 0;
+        }
+        
+        if (nextBtn) {
+            nextBtn.disabled = currentIndex === flashcards.length - 1;
+        }
+        
+        // Reset card to front side
+        resetCard();
+    }
+    
+    function flipCard() {
+        const flashcardDisplay = document.getElementById('flashcardDisplay');
+        
+        if (!isFlipped) {
+            // Flip to back
+            if (flashcardDisplay) {
+                flashcardDisplay.style.transform = 'rotateY(180deg)';
+            }
+            isFlipped = true;
+        } else {
+            // Flip back to front
+            if (flashcardDisplay) {
+                flashcardDisplay.style.transform = 'rotateY(0deg)';
+            }
+            isFlipped = false;
+        }
+    }
+    
+    function resetCard() {
+        const flashcardDisplay = document.getElementById('flashcardDisplay');
+        
+        if (flashcardDisplay) {
+            flashcardDisplay.style.transform = 'rotateY(0deg)';
+        }
+        isFlipped = false;
+    }
+    
+    function previousCard() {
+        if (currentIndex > 0) {
+            currentIndex--;
+            updateCard();
+        }
+    }
+    
+    function nextCard() {
+        if (currentIndex < flashcards.length - 1) {
+            currentIndex++;
+            updateCard();
+        }
+    }
+    
+    // Keyboard navigation
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            previousCard();
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            nextCard();
+        } else if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            flipCard();
+        }
+    });
+</script>
+
+<style>
+    .flashcard-display {
+        transition: transform 0.6s;
+        transform-style: preserve-3d;
+        perspective: 1000px;
+        background-color: var(--dark-card);
+        border: 2px solid var(--mint-green-dark);
+        color: var(--text-light);
+    }
+    
+    .flashcard-display:hover {
+        box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    }
+    
+    .flashcard-side {
+        backface-visibility: hidden;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 300px;
+    }
+    
+    .front-side {
+        transform: rotateY(0deg);
+    }
+    
+    .back-side {
+        transform: rotateY(180deg);
+    }
+    
+    .flashcard-display .card-body {
+        transform-style: preserve-3d;
+        position: relative;
+    }
+</style>
+{% endblock %}
+

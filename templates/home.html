@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Home - OnlyFlashcards.com{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <!-- Hero Section -->
+    <div class="row mb-5">
+        <div class="col-12 text-center">
+            <h1 class="display-5 mb-4">Create, share, and study with flashcards. Make learning easier!</h1>
+        </div>
+    </div>
+    
+    <!-- Quick Create Section (for logged in users) - Above Search -->
+    {% if user %}
+    <div class="row mb-4">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-body p-4 text-center">
+                    <h5 class="card-title mb-3"><i class="bi bi-plus-circle"></i> Create New Flashcard Set</h5>
+                    <button class="btn btn-primary btn-lg" onclick="showCreateModal()">
+                        <i class="bi bi-plus-lg"></i> Create Set
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Search Section -->
+    <div class="row mb-5">
+        <div class="col-lg-8 mx-auto">
+            <div class="card">
+                <div class="card-body p-4">
+                    <h5 class="card-title mb-3"><i class="bi bi-search"></i> Search Flashcard Sets</h5>
+                    <form id="searchForm">
+                        <div class="input-group">
+                            <input type="text" class="form-control form-control-lg" id="searchQuery" 
+                                   placeholder="Search for flashcard sets by title...">
+                            <button class="btn btn-primary btn-lg" type="submit">
+                                <i class="bi bi-search"></i> Search
+                            </button>
+                        </div>
+                    </form>
+                    <div id="searchResults" class="mt-4"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Recent Public Sets -->
+    <div class="row">
+        <div class="col-12">
+            <h3 class="mb-4"><i class="bi bi-collection"></i> Popular Flashcard Sets</h3>
+            <div id="setsContainer" class="row">
+                {% for set in recent_sets %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            {{ set.title }}
+                        </div>
+                        <div class="card-body">
+                            <p class="card-text text-muted">
+                                {{ set.description[:100] }}{% if set.description|length > 100 %}...{% endif %}
+                            </p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-muted">
+                                    <i class="bi bi-calendar"></i> {{ set.created_at.strftime('%b %d, %Y') if set.created_at else 'Recently' }}
+                                </small>
+                                {% if set.is_public %}
+                                <span class="badge bg-mint text-dark">Public</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="card-footer bg-transparent border-0">
+                            <a href="/set/{{ set._id }}" class="btn btn-sm btn-outline-primary w-100">
+                                View Set <i class="bi bi-arrow-right"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% if not recent_sets %}
+                <div class="col-12">
+                    <div class="alert alert-info text-center">
+                        <i class="bi bi-info-circle"></i> No public flashcard sets yet. Be the first to create one!
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Set Modal -->
+{% if user %}
+<div class="modal fade" id="createSetModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-mint">
+                <h5 class="modal-title">Create New Flashcard Set</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createSetForm">
+                    <div class="mb-3">
+                        <label for="setTitle" class="form-label">Title *</label>
+                        <input type="text" class="form-control" id="setTitle" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="setDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="setDescription" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="setPublic">
+                        <label class="form-check-label" for="setPublic">
+                            Make this set public
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="createSet()">Create Set</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Search functionality
+    document.getElementById('searchForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const query = document.getElementById('searchQuery').value.trim();
+        
+        if (!query) {
+            alert('Please enter a search query');
+            return;
+        }
+        
+        try {
+            const response = await fetch(`/sets/search?q=${encodeURIComponent(query)}`);
+            const data = await response.json();
+            
+            if (data.error) {
+                document.getElementById('searchResults').innerHTML = 
+                    `<div class="alert alert-danger">${data.error}</div>`;
+                return;
+            }
+            
+            if (data.sets.length === 0) {
+                document.getElementById('searchResults').innerHTML = 
+                    `<div class="alert alert-info">No results found for "${query}"</div>`;
+                return;
+            }
+            
+            let html = `<h6 class="mb-3">Found ${data.count} result(s):</h6><ul class="list-group">`;
+            data.sets.forEach(set => {
+                html += `
+                    <li class="list-group-item list-group-item-action" style="cursor: pointer; background-color: var(--dark-card); border-color: var(--dark-border);" onclick="window.location.href='/set/${set.id}'">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">${escapeHtml(set.title)}</h6>
+                                <p class="mb-1 text-muted small">${escapeHtml(set.description || 'No description')}</p>
+                                <small class="text-muted">
+                                    <i class="bi bi-person"></i> ${escapeHtml(set.username || 'Unknown user')}
+                                </small>
+                            </div>
+                            ${set.is_public ? '<span class="badge bg-mint text-dark ms-2">Public</span>' : ''}
+                        </div>
+                    </li>
+                `;
+            });
+            html += '</ul>';
+            document.getElementById('searchResults').innerHTML = html;
+        } catch (error) {
+            console.error('Search error:', error);
+            document.getElementById('searchResults').innerHTML = 
+                '<div class="alert alert-danger">Error searching. Please try again.</div>';
+        }
+    });
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    {% if user %}
+    function showCreateModal() {
+        const modal = new bootstrap.Modal(document.getElementById('createSetModal'));
+        modal.show();
+    }
+    
+    async function createSet() {
+        const title = document.getElementById('setTitle').value.trim();
+        const description = document.getElementById('setDescription').value.trim();
+        const isPublic = document.getElementById('setPublic').checked;
+        
+        if (!title) {
+            alert('Title is required');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/sets', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    title: title,
+                    description: description,
+                    is_public: isPublic
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                alert('Error: ' + data.error);
+                return;
+            }
+            
+            // Redirect to dashboard or the new set
+            window.location.href = '/dashboard';
+        } catch (error) {
+            console.error('Create set error:', error);
+            alert('Error creating set. Please try again.');
+        }
+    }
+    {% endif %}
+</script>
+{% endblock %}
+
